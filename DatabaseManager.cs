@@ -35,6 +35,81 @@ public class DatabaseManager : IDisposable
 
         var schema = File.ReadAllText(schemaPath);
         ExecuteNonQuery(schema);
+
+        // Run migration to v2 if needed
+        MigrateToV2IfNeeded();
+    }
+
+    private void MigrateToV2IfNeeded()
+    {
+        // Check if Software table exists
+        var tableExists = ExecuteScalar(
+            "SELECT COUNT(*) FROM sqlite_master WHERE type='table' AND name='Software'"
+        );
+
+        if (Convert.ToInt64(tableExists) > 0)
+        {
+            return; // Already migrated
+        }
+
+        Console.WriteLine("Migrating database to v2 (adding Software table)...");
+
+        // Step 1: Create Software table
+        ExecuteNonQuery(@"
+            CREATE TABLE IF NOT EXISTS Software (
+                Id INTEGER PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL UNIQUE,
+                Version TEXT,
+                Description TEXT,
+                CreatedDate TEXT NOT NULL
+            )
+        ");
+
+        // Step 2: Add SoftwareId column to Assemblies
+        try
+        {
+            ExecuteNonQuery(@"
+                ALTER TABLE Assemblies ADD COLUMN SoftwareId INTEGER
+                REFERENCES Software(Id) ON DELETE SET NULL
+            ");
+        }
+        catch (SqliteException ex) when (ex.Message.Contains("duplicate column"))
+        {
+            // Column already exists, skip
+        }
+
+        // Step 3: Create index
+        ExecuteNonQuery(@"
+            CREATE INDEX IF NOT EXISTS idx_assemblies_software ON Assemblies(SoftwareId)
+        ");
+
+        // Step 4: Recreate vw_TypesDetail view
+        ExecuteNonQuery("DROP VIEW IF EXISTS vw_TypesDetail");
+        ExecuteNonQuery(@"
+            CREATE VIEW vw_TypesDetail AS
+            SELECT
+                t.Id,
+                t.Name,
+                t.FullName,
+                t.TypeKind,
+                t.IsAbstract,
+                t.IsSealed,
+                t.IsStatic,
+                n.Name AS Namespace,
+                a.Name AS Assembly,
+                a.Version AS AssemblyVersion,
+                s.Name AS Software,
+                s.Version AS SoftwareVersion,
+                bt.FullName AS BaseType,
+                t.Summary
+            FROM Types t
+            JOIN Namespaces n ON t.NamespaceId = n.Id
+            JOIN Assemblies a ON n.AssemblyId = a.Id
+            LEFT JOIN Software s ON a.SoftwareId = s.Id
+            LEFT JOIN Types bt ON t.BaseTypeId = bt.Id
+        ");
+
+        Console.WriteLine("Migration to v2 completed successfully.");
     }
 
     public void ExecuteNonQuery(string sql, params SqliteParameter[] parameters)

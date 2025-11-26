@@ -14,7 +14,7 @@ public class DllAnalyzer
         _db = db;
     }
 
-    public void AnalyzeAssembly(string dllPath, bool forceReAnalyze = false)
+    public void AnalyzeAssembly(string dllPath, bool forceReAnalyze = false, long? softwareId = null)
     {
         dllPath = DllLoader.ConvertToAbsolutePath(dllPath);
 
@@ -48,7 +48,7 @@ public class DllAnalyzer
         try
         {
             // Insert assembly record
-            var assemblyId = InsertAssembly(assembly, dllPath, fileHash);
+            var assemblyId = InsertAssembly(assembly, dllPath, fileHash, softwareId);
 
             // Get all types
             var types = assembly.GetExportedTypes().OrderBy(t => t.FullName).ToArray();
@@ -89,7 +89,7 @@ public class DllAnalyzer
         }
     }
 
-    private long InsertAssembly(Assembly assembly, string filePath, string fileHash)
+    private long InsertAssembly(Assembly assembly, string filePath, string fileHash, long? softwareId = null)
     {
         var assemblyName = assembly.GetName();
         var name = assemblyName.Name ?? "Unknown";
@@ -113,15 +113,16 @@ public class DllAnalyzer
         }
 
         return _db.ExecuteInsert(
-            @"INSERT INTO Assemblies (Name, FullName, Version, FilePath, TargetFramework, AnalyzedDate, FileHash)
-              VALUES (@name, @fullName, @version, @filePath, @framework, @date, @hash)",
+            @"INSERT INTO Assemblies (Name, FullName, Version, FilePath, TargetFramework, AnalyzedDate, FileHash, SoftwareId)
+              VALUES (@name, @fullName, @version, @filePath, @framework, @date, @hash, @softwareId)",
             new SqliteParameter("@name", name),
             new SqliteParameter("@fullName", fullName),
             new SqliteParameter("@version", version),
             new SqliteParameter("@filePath", filePath),
             new SqliteParameter("@framework", targetFramework),
             new SqliteParameter("@date", DateTime.UtcNow.ToString("O")),
-            new SqliteParameter("@hash", fileHash)
+            new SqliteParameter("@hash", fileHash),
+            new SqliteParameter("@softwareId", softwareId.HasValue ? (object)softwareId.Value : DBNull.Value)
         );
     }
 

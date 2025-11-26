@@ -36,7 +36,9 @@ public static class DatabaseQueryTools
     [McpServerTool, Description("Analyzes a .NET DLL and stores all metadata in the database. This must be run before querying.")]
     public static string AnalyzeDll(
         [Description("Path to the DLL file")] string dllPath,
-        [Description("Force re-analysis even if already in database")] bool forceReAnalyze = false)
+        [Description("Force re-analysis even if already in database")] bool forceReAnalyze = false,
+        [Description("Optional software name to associate with this DLL (e.g., 'AutoCAD Civil 3D 2024')")] string? softwareName = null,
+        [Description("Optional software version")] string? softwareVersion = null)
     {
         if (string.IsNullOrEmpty(dllPath))
             return "Error: dllPath parameter is required";
@@ -46,9 +48,35 @@ public static class DatabaseQueryTools
             var db = GetDatabase();
             var analyzer = new DllAnalyzer(db);
 
-            analyzer.AnalyzeAssembly(dllPath, forceReAnalyze);
+            long? softwareId = null;
+            if (!string.IsNullOrEmpty(softwareName))
+            {
+                // Find or create software entry
+                var existing = db.ExecuteQuery(
+                    "SELECT Id FROM Software WHERE Name = @name",
+                    new Microsoft.Data.Sqlite.SqliteParameter("@name", softwareName));
 
-            return $"Successfully analyzed DLL: {dllPath}";
+                if (existing.Count > 0)
+                {
+                    softwareId = Convert.ToInt64(existing[0]["Id"]);
+                }
+                else
+                {
+                    // Create new software entry
+                    softwareId = db.ExecuteInsert(
+                        "INSERT INTO Software (Name, Version, CreatedDate) VALUES (@name, @version, @date)",
+                        new Microsoft.Data.Sqlite.SqliteParameter("@name", softwareName),
+                        new Microsoft.Data.Sqlite.SqliteParameter("@version", softwareVersion ?? ""),
+                        new Microsoft.Data.Sqlite.SqliteParameter("@date", DateTime.UtcNow.ToString("o")));
+                }
+            }
+
+            analyzer.AnalyzeAssembly(dllPath, forceReAnalyze, softwareId);
+
+            var msg = $"Successfully analyzed DLL: {dllPath}";
+            if (!string.IsNullOrEmpty(softwareName))
+                msg += $"\nAssociated with software: {softwareName}";
+            return msg;
         }
         catch (Exception ex)
         {
@@ -57,20 +85,36 @@ public static class DatabaseQueryTools
     }
 
     [McpServerTool, Description("Lists all assemblies currently in the database")]
-    public static string ListAssemblies()
+    public static string ListAssemblies([Description("Optional software name to filter by")] string? softwareName = null)
     {
         try
         {
             var db = GetDatabase();
-            var results = db.ExecuteQuery(@"
-                SELECT Name, Version, AnalyzedDate,
+            string sql = @"
+                SELECT a.Name, a.Version, a.AnalyzedDate, s.Name as Software, s.Version as SoftwareVersion,
                        (SELECT COUNT(*) FROM Namespaces WHERE AssemblyId = a.Id) as NamespaceCount,
                        (SELECT COUNT(*) FROM Types t JOIN Namespaces n ON t.NamespaceId = n.Id WHERE n.AssemblyId = a.Id) as TypeCount
                 FROM Assemblies a
-                ORDER BY Name, Version");
+                LEFT JOIN Software s ON a.SoftwareId = s.Id";
+
+            if (!string.IsNullOrEmpty(softwareName))
+            {
+                sql += " WHERE s.Name = @softwareName";
+            }
+
+            sql += " ORDER BY s.Name, a.Name, a.Version";
+
+            var results = string.IsNullOrEmpty(softwareName)
+                ? db.ExecuteQuery(sql)
+                : db.ExecuteQuery(sql, new Microsoft.Data.Sqlite.SqliteParameter("@softwareName", softwareName));
 
             if (results.Count == 0)
-                return "No assemblies found in database. Use analyze_dll to add assemblies.";
+            {
+                if (string.IsNullOrEmpty(softwareName))
+                    return "No assemblies found in database. Use analyze_dll to add assemblies.";
+                else
+                    return $"No assemblies found for software: {softwareName}";
+            }
 
             var sb = new StringBuilder();
             sb.AppendLine("ASSEMBLIES IN DATABASE:");
@@ -80,6 +124,8 @@ public static class DatabaseQueryTools
             {
                 sb.AppendLine($"Name: {row["Name"]}");
                 sb.AppendLine($"  Version: {row["Version"]}");
+                if (row["Software"] != null)
+                    sb.AppendLine($"  Software: {row["Software"]} {row["SoftwareVersion"]}");
                 sb.AppendLine($"  Analyzed: {row["AnalyzedDate"]}");
                 sb.AppendLine($"  Namespaces: {row["NamespaceCount"]}");
                 sb.AppendLine($"  Types: {row["TypeCount"]}");
@@ -581,6 +627,83 @@ public static class DatabaseQueryTools
         catch (Exception ex)
         {
             return $"Error finding implementations: {ex.Message}";
+        }
+    }
+
+    [McpServerTool, Description("Lists all software products in the database")]
+    public static string ListSoftware()
+    {
+        try
+        {
+            var db = GetDatabase();
+            var results = db.ExecuteQuery(@"
+                SELECT s.Name, s.Version, s.Description,
+                       (SELECT COUNT(*) FROM Assemblies WHERE SoftwareId = s.Id) as AssemblyCount
+                FROM Software s
+                ORDER BY s.Name, s.Version");
+
+            if (results.Count == 0)
+                return "No software products found in database.";
+
+            var sb = new StringBuilder();
+            sb.AppendLine("SOFTWARE PRODUCTS:");
+            sb.AppendLine();
+
+            foreach (var row in results)
+            {
+                sb.AppendLine($"Name: {row["Name"]}");
+                if (!string.IsNullOrEmpty(row["Version"]?.ToString()))
+                    sb.AppendLine($"  Version: {row["Version"]}");
+                if (!string.IsNullOrEmpty(row["Description"]?.ToString()))
+                    sb.AppendLine($"  Description: {row["Description"]}");
+                sb.AppendLine($"  Assemblies: {row["AssemblyCount"]}");
+                sb.AppendLine();
+            }
+
+            return sb.ToString();
+        }
+        catch (Exception ex)
+        {
+            return $"Error listing software: {ex.Message}";
+        }
+    }
+
+    [McpServerTool, Description("Associates an existing assembly with a software product")]
+    public static string AssociateAssemblyWithSoftware(
+        [Description("Assembly name")] string assemblyName,
+        [Description("Software name")] string softwareName)
+    {
+        if (string.IsNullOrEmpty(assemblyName) || string.IsNullOrEmpty(softwareName))
+            return "Error: Both assemblyName and softwareName are required";
+
+        try
+        {
+            var db = GetDatabase();
+
+            // Find software
+            var software = db.ExecuteQuery(
+                "SELECT Id FROM Software WHERE Name = @name",
+                new Microsoft.Data.Sqlite.SqliteParameter("@name", softwareName));
+
+            if (software.Count == 0)
+                return $"Error: Software not found: {softwareName}. Create it first using analyze_dll with softwareName parameter.";
+
+            var softwareId = Convert.ToInt64(software[0]["Id"]);
+
+            // Update assembly
+            var updated = db.ExecuteScalar(
+                "UPDATE Assemblies SET SoftwareId = @softwareId WHERE Name = @assemblyName; SELECT changes()",
+                new Microsoft.Data.Sqlite.SqliteParameter("@softwareId", softwareId),
+                new Microsoft.Data.Sqlite.SqliteParameter("@assemblyName", assemblyName));
+
+            if (Convert.ToInt64(updated) == 0)
+                return $"Error: Assembly not found: {assemblyName}";
+
+            return $"Successfully associated {assemblyName} with {softwareName}";
+        }
+        catch (Exception ex)
+        {
+            return $"Error associating assembly: {ex.Message}";
         }
     }
 }
