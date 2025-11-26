@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.1.1] - 2025-11-26
+
+### Changed
+- Default database name changed from `civil3d_api.db` to `dll_inspector.db` for broader applicability
+
+### Fixed
+- Corrected changelog dates (2024 → 2025)
+- Updated version links to use correct repository URL
+
 ## [2.1.0] - 2025-11-26
 
 ### Fixed
@@ -59,6 +68,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MetadataLoadContext-based DLL loading for safe inspection
 - Support for .NET Framework and .NET Core assemblies
 
+[2.1.1]: https://github.com/jadjhaddad/mcp-dotnet-explorer/compare/v2.1.0...v2.1.1
 [2.1.0]: https://github.com/jadjhaddad/mcp-dotnet-explorer/compare/v2.0.0...v2.1.0
 [2.0.0]: https://github.com/jadjhaddad/mcp-dotnet-explorer/releases/tag/v2.0.0
 [1.0.0]: https://github.com/jadjhaddad/mcp-dotnet-explorer/releases/tag/v1.0.0
