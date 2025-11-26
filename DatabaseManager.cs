@@ -7,7 +7,7 @@ namespace DllInspectorMcp;
 public class DatabaseManager : IDisposable
 {
     private readonly SqliteConnection _connection;
-    private const string DefaultDatabaseName = "civil3d_api.db";
+    private const string DefaultDatabaseName = "dll_inspector.db";
 
     public DatabaseManager(string databasePath = null)
     {

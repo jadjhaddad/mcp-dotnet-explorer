@@ -5,7 +5,17 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [2.0.0] - 2024-01-26
+## [2.1.0] - 2025-11-26
+
+### Fixed
+- Parameter default value extraction now uses `RawDefaultValue` instead of `DefaultValue` for improved reliability
+- Better handling of optional parameters in third-party .NET assemblies (tested with CSiBridge 25)
+
+### Changed
+- Default database name changed from `civil3d_api.db` to `dll_inspector.db` for broader applicability
+- README version badge updated to reflect v2.1.0
+
+## [2.0.0] - 2025-11-26
 
 ### Added
 - **Software Differentiation**: New `Software` table to categorize DLLs by product
@@ -28,7 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Build error caused by multiple files with top-level statements
 - Excluded `TestRunner.cs` and `TestDllLoader.cs` from compilation
 
-## [1.0.0] - 2024-01-26
+## [1.0.0] - 2025-11-26
 
 ### Added
 - Initial release of DLL Inspector MCP Server
@@ -49,5 +59,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MetadataLoadContext-based DLL loading for safe inspection
 - Support for .NET Framework and .NET Core assemblies
 
-[2.0.0]: https://github.com/yourrepo/dll-inspector-mcp/compare/v1.0.0...v2.0.0
-[1.0.0]: https://github.com/yourrepo/dll-inspector-mcp/releases/tag/v1.0.0
+[2.1.0]: https://github.com/jadjhaddad/mcp-dotnet-explorer/compare/v2.0.0...v2.1.0
+[2.0.0]: https://github.com/jadjhaddad/mcp-dotnet-explorer/releases/tag/v2.0.0
+[1.0.0]: https://github.com/jadjhaddad/mcp-dotnet-explorer/releases/tag/v1.0.0
