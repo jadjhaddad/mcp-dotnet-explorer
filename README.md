@@ -1,6 +1,8 @@
-# Civil3D DLL Inspector MCP Server
+# DLL Inspector MCP Server
 
-A Model Context Protocol (MCP) server that analyzes .NET assembly DLLs and stores metadata in a SQLite database for efficient querying. Designed specifically for exploring Autodesk Civil 3D and AutoCAD APIs.
+**Version 2.0.0** - Now with Software Differentiation Support!
+
+A Model Context Protocol (MCP) server that analyzes .NET assembly DLLs and stores metadata in a SQLite database for efficient querying. Originally designed for exploring Autodesk Civil 3D and AutoCAD APIs, now supports multiple software products in a single database.
 
 ## Overview
 
@@ -8,6 +10,9 @@ This MCP server provides a comprehensive database-driven solution for exploring 
 
 ## Key Features
 
+- **Software Differentiation** (NEW in v2.0): Organize DLLs by software product (Civil 3D, Revit, Dynamo, etc.)
+- **Filtered Queries** (NEW in v2.0): Query only DLLs from specific software without searching the entire database
+- **Automatic Migration**: Seamlessly upgrades from v1 to v2 schema
 - **One-time analysis**: Analyze DLLs once and query the database repeatedly without reloading
 - **Comprehensive metadata**: Captures types, methods, properties, fields, events, parameters, inheritance, interfaces, and more
 - **Smart updates**: Hash-based change detection only re-analyzes when DLLs change
@@ -25,16 +30,41 @@ Analyzes a .NET DLL and stores all metadata in the database.
 **Parameters:**
 - `dllPath` (required): Path to the DLL file (Windows or WSL format)
 - `forceReAnalyze` (optional): Force re-analysis even if already in database (default: false)
+- `softwareName` (optional, NEW in v2.0): Software name to associate with this DLL (e.g., "AutoCAD Civil 3D 2024")
+- `softwareVersion` (optional, NEW in v2.0): Software version
 
 **Example:**
 ```
 dllPath: "C:\Program Files\Autodesk\AutoCAD 2024\C3D\AeccDbMgd.dll"
+softwareName: "AutoCAD Civil 3D"
+softwareVersion: "2024"
 ```
 
 #### `list_assemblies`
 Lists all assemblies currently in the database with statistics.
 
-**Returns:** Assembly names, versions, analysis dates, namespace counts, and type counts
+**Parameters:**
+- `softwareName` (optional, NEW in v2.0): Filter assemblies by software name
+
+**Returns:** Assembly names, versions, software association, analysis dates, namespace counts, and type counts
+
+#### `list_software` (NEW in v2.0)
+Lists all software products in the database with assembly counts.
+
+**Returns:** Software names, versions, descriptions, and number of associated assemblies
+
+#### `associate_assembly_with_software` (NEW in v2.0)
+Associates an existing assembly with a software product.
+
+**Parameters:**
+- `assemblyName` (required): Assembly name
+- `softwareName` (required): Software name
+
+**Example:**
+```
+assemblyName: "AeccDbMgd"
+softwareName: "AutoCAD Civil 3D"
+```
 
 ### Type Discovery
 
@@ -183,30 +213,49 @@ Add this server to your Claude Code MCP settings file.
 
 ## Usage Workflow
 
-### 1. Analyze Civil3D DLLs
+### 1. Analyze DLLs (with Software Association)
 
-First, analyze the Civil3D assemblies you want to explore:
+First, analyze the assemblies you want to explore. **New in v2.0**: You can now associate DLLs with software products:
 
 ```
 analyze_dll
   dllPath: "C:\Program Files\Autodesk\AutoCAD 2024\C3D\AeccDbMgd.dll"
+  softwareName: "AutoCAD Civil 3D"
+  softwareVersion: "2024"
 ```
 
-You can analyze multiple assemblies:
-
-```
-analyze_dll
-  dllPath: "C:\Program Files\Autodesk\AutoCAD 2024\acdbmgd.dll"
-```
+You can analyze multiple software products in the same database:
 
 ```
 analyze_dll
-  dllPath: "C:\Program Files\Autodesk\AutoCAD 2024\acmgd.dll"
+  dllPath: "C:\Program Files\Autodesk\Revit 2024\RevitAPI.dll"
+  softwareName: "Revit"
+  softwareVersion: "2024"
+```
+
+```
+analyze_dll
+  dllPath: "C:\Program Files\Dynamo\DynamoCore.dll"
+  softwareName: "Dynamo"
+  softwareVersion: "2.x"
 ```
 
 The first analysis will take time, but subsequent queries will be instant!
 
+**Tip:** Software association is optional. If you don't specify it, the DLL will still be analyzed and available for querying.
+
 ### 2. Explore the API
+
+**New in v2.0**: View all software products and filter by software:
+```
+list_software
+```
+
+List assemblies from a specific software:
+```
+list_assemblies
+  softwareName: "AutoCAD Civil 3D"
+```
 
 List available namespaces:
 ```
@@ -262,7 +311,8 @@ You can inspect or query it directly using any SQLite client.
 
 The database includes the following tables:
 
-- **Assemblies**: DLL metadata and versions
+- **Software** (NEW in v2.0): Software product information
+- **Assemblies**: DLL metadata and versions (now with optional SoftwareId)
 - **Namespaces**: Namespace organization
 - **Types**: Classes, interfaces, enums, structs
 - **Members**: Methods, properties, fields, events, constructors
@@ -272,7 +322,8 @@ The database includes the following tables:
 - **PropertyAccessors**: Property getter/setter information
 - **MembersSearch**: Full-text search index
 
-See `DatabaseSchema.sql` for the complete schema definition.
+See `DatabaseSchema.sql` for the complete v1 schema, or `DatabaseSchema_v2.sql` for v2 schema.
+See `MIGRATION_V2.md` for migration details.
 
 ## Architecture
 
@@ -327,9 +378,13 @@ You can use either format when calling the tools.
 
 ## Documentation
 
+- **CHANGELOG.md**: Version history and changes
+- **FEATURE_SUMMARY.md**: Summary of v2.0 software differentiation feature
+- **MIGRATION_V2.md**: Database migration guide from v1 to v2
 - **CIVIL3D_API_STRUCTURE.md**: Comprehensive documentation of the Civil3D API structure
 - **PROJECT_STATUS.md**: Project development status and roadmap
-- **DatabaseSchema.sql**: Complete database schema with comments
+- **DatabaseSchema.sql**: Complete v1 database schema with comments
+- **DatabaseSchema_v2.sql**: Complete v2 database schema with Software table
 
 ## Dependencies
 
