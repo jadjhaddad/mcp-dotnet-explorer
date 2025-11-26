@@ -1,6 +1,6 @@
 # DLL Inspector MCP Server
 
-**Version 2.0.0** - Now with Software Differentiation Support!
+**Version 2.1.0** - Improved parameter default value handling
 
 A Model Context Protocol (MCP) server that analyzes .NET assembly DLLs and stores metadata in a SQLite database for efficient querying. Originally designed for exploring Autodesk Civil 3D and AutoCAD APIs, now supports multiple software products in a single database.
 

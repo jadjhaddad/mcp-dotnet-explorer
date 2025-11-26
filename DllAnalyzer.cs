@@ -390,7 +390,7 @@ public class DllAnalyzer
                 new SqliteParameter("@type", param.ParameterType.FullName ?? param.ParameterType.Name),
                 new SqliteParameter("@position", i),
                 new SqliteParameter("@isOptional", param.IsOptional ? 1 : 0),
-                new SqliteParameter("@defaultValue", param.HasDefaultValue ? param.DefaultValue?.ToString() ?? "null" : DBNull.Value),
+                new SqliteParameter("@defaultValue", param.HasDefaultValue ? param.RawDefaultValue?.ToString() ?? "null" : DBNull.Value),
                 new SqliteParameter("@isParams", isParams ? 1 : 0),
                 new SqliteParameter("@isOut", param.IsOut ? 1 : 0),
                 new SqliteParameter("@isRef", param.ParameterType.IsByRef && !param.IsOut ? 1 : 0),
